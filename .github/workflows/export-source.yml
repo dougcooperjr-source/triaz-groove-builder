@@ -1,0 +1,44 @@
+name: Export Patched Source
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Expand v0.1.9 source bundle
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "bundle\v019_part*.txt" | Sort-Object Name
+          if ($parts.Count -ne 6) { throw "Expected 6 v0.1.9 source bundle parts; found $($parts.Count)." }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
+          tar -xf source_bundle.tar.xz
+
+      - name: Apply v0.1.10 patch
+        shell: pwsh
+        run: |
+          python build_patches\v0110_startup_fix.py
+          python -m compileall -q app.py launcher.py triaz_groove_builder
+
+      - name: Upload patched source
+        uses: actions/upload-artifact@v4
+        with:
+          name: triaz-groove-builder-source-v0.1.10
+          path: |
+            app.py
+            launcher.py
+            requirements.txt
+            VERSION
+            README.md
+            installer/
+            triaz_groove_builder/
+          retention-days: 7
