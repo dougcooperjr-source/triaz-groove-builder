@@ -16,21 +16,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Expand source bundle
+      - name: Expand v0.1.9 source bundle
         shell: pwsh
         run: |
-          $parts = Get-ChildItem "bundle\part*.txt" | Sort-Object Name
-          if ($parts.Count -lt 1) { throw "Source bundle parts were not found." }
+          $parts = Get-ChildItem "bundle\v019_part*.txt" | Sort-Object Name
+          if ($parts.Count -ne 6) { throw "Expected 6 v0.1.9 source bundle parts; found $($parts.Count)." }
           $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
           [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
           tar -xf source_bundle.tar.xz
-          if (!(Test-Path "launcher.py")) { throw "Source bundle did not extract correctly." }
+          if (!(Test-Path "app.py")) { throw "Source bundle did not extract correctly." }
+          if (!(Test-Path "launcher.py")) { throw "Launcher source is missing." }
+          if (!(Test-Path "triaz_groove_builder\editor.py")) { throw "Groove Editor source is missing." }
           if (!(Test-Path "installer\triaz_groove_builder.iss")) { throw "Installer source was not extracted." }
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Validate source
+        shell: pwsh
+        run: |
+          python -m compileall -q app.py launcher.py triaz_groove_builder
+          if ($LASTEXITCODE -ne 0) { throw "Python source validation failed." }
 
       - name: Build launcher EXE
         shell: pwsh
@@ -60,14 +68,15 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
-          $installer = Get-ChildItem artifacts\*.exe | Select-Object -First 1
-          if (!$installer) { throw "Setup.exe was not created." }
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.9.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.9 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer
-          path: artifacts/*.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.9
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.9.exe
           if-no-files-found: error
           retention-days: 30
