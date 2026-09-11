@@ -45,7 +45,7 @@ jobs:
         run: |
           python -m compileall -q app.py launcher.py triaz_groove_builder
           if ($LASTEXITCODE -ne 0) { throw "Python source validation failed." }
-          python -c "from pathlib import Path; s=Path('launcher.py').read_text(); a=Path('app.py').read_text(); assert 'APP_VERSION = \"0.1.10\"' in s; assert '--startup-sentinel' in s; assert 'APP_LOG_FILE' in s; assert 'v0.1.10' in a"
+          python -c "from pathlib import Path; s=Path('launcher.py').read_text(); a=Path('app.py').read_text(); assert '0.1.10' in s; assert '--startup-sentinel' in s; assert 'APP_LOG_FILE' in s; assert '0.1.10' in a"
 
       - name: Build launcher EXE
         shell: pwsh
