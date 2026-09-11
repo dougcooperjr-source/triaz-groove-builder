@@ -1,0 +1,9 @@
+v0.1.16 supersedes v0.1.15 testing feedback.
+
+Changes:
+- Adds per-row whole-number BPM override with re-analysis.
+- Uses manual BPM before downstream timing.
+- Anchors selected drum loop start to a real source hit when the chosen loop starts before the first meaningful event.
+- Rolls back the v0.1.15 direct source-event-to-grid merge that caused over-generation.
+- Keeps v0.1.14 visual editor improvements and v0.1.15 editor conveniences such as removed misleading alignment score/button, transport restart behavior, and velocity resize/nudge.
+- Offset remains deferred.
