@@ -2,7 +2,7 @@ name: Build Windows Installer
 
 on:
   push:
-    branches: [main]
+    branches: [main, v0.1.11-triaz-editor]
   workflow_dispatch:
 
 permissions:
@@ -16,14 +16,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Expand v0.1.9 source bundle
+      - name: Expand v0.1.11 source bundle
         shell: pwsh
         run: |
-          $parts = Get-ChildItem "bundle\v019_part*.txt" | Sort-Object Name
-          if ($parts.Count -ne 6) { throw "Expected 6 v0.1.9 source bundle parts; found $($parts.Count)." }
-          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
-          [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
-          tar -xf source_bundle.tar.xz
+          if (!(Test-Path "bundle\source_v0111.tar.xz")) { throw "v0.1.11 source bundle is missing." }
+          tar -tf "bundle\source_v0111.tar.xz" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.11 source bundle is invalid." }
+          tar -xf "bundle\source_v0111.tar.xz"
           if (!(Test-Path "app.py")) { throw "Source bundle did not extract correctly." }
           if (!(Test-Path "launcher.py")) { throw "Launcher source is missing." }
           if (!(Test-Path "triaz_groove_builder\editor.py")) { throw "Groove Editor source is missing." }
@@ -34,18 +33,26 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Apply v0.1.10 startup reliability fix
-        shell: pwsh
-        run: |
-          python build_patches\v0110_startup_fix.py
-          if ($LASTEXITCODE -ne 0) { throw "v0.1.10 patch failed." }
-
-      - name: Validate source
+      - name: Validate source and editor features
         shell: pwsh
         run: |
           python -m compileall -q app.py launcher.py triaz_groove_builder
           if ($LASTEXITCODE -ne 0) { throw "Python source validation failed." }
-          python -c "from pathlib import Path; s=Path('launcher.py').read_text(); a=Path('app.py').read_text(); assert '0.1.10' in s; assert '--startup-sentinel' in s; assert 'APP_LOG_FILE' in s; assert '0.1.10' in a"
+          @'
+          from pathlib import Path
+          app = Path('app.py').read_text(encoding='utf-8')
+          editor = Path('triaz_groove_builder/editor.py').read_text(encoding='utf-8')
+          installer = Path('installer/triaz_groove_builder.iss').read_text(encoding='utf-8')
+          assert 'v0.1.11' in app
+          assert 'APP_VERSION = "0.1.11"' in Path('launcher.py').read_text(encoding='utf-8')
+          assert '▶ PLAY OVERLAY' in editor
+          assert '_draw_playhead_only' in editor
+          assert 'RATE' in editor and 'STEPS' in editor
+          assert 'approval-gated: ANALYZE / CREATE PREVIEWS' not in app
+          assert 'DisableDirPage=no' in installer
+          assert '#define MyAppVersion "0.1.11"' in installer
+          print('v0.1.11 source validation passed')
+          '@ | python -
 
       - name: Build launcher EXE
         shell: pwsh
@@ -76,14 +83,14 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
-          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.10.exe | Select-Object -First 1
-          if (!$installer) { throw "v0.1.10 Setup.exe was not created." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.11.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.11 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.10
-          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.10.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.11
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.11.exe
           if-no-files-found: error
           retention-days: 30
