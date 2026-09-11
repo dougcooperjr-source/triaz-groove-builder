@@ -14,25 +14,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Expand v0.1.9 source bundle
+      - name: Expand current v0.1.11 source bundle
         shell: pwsh
         run: |
-          $parts = Get-ChildItem "bundle\v019_part*.txt" | Sort-Object Name
-          if ($parts.Count -ne 6) { throw "Expected 6 v0.1.9 source bundle parts; found $($parts.Count)." }
-          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
+          $parts = @(
+            "bundle\v0111_part00a.txt",
+            "bundle\v0111_part00b.txt",
+            "bundle\v0111_part01.txt",
+            "bundle\v0111_part02.txt",
+            "bundle\v0111_part03.txt",
+            "bundle\v0111_part04.txt",
+            "bundle\v0111_part05.txt"
+          )
+          foreach ($p in $parts) {
+            if (!(Test-Path $p)) { throw "Missing source part: $p" }
+          }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
           [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
           tar -xf source_bundle.tar.xz
-
-      - name: Apply v0.1.10 patch
-        shell: pwsh
-        run: |
-          python build_patches\v0110_startup_fix.py
           python -m compileall -q app.py launcher.py triaz_groove_builder
+          if ($LASTEXITCODE -ne 0) { throw "Current source validation failed." }
 
-      - name: Upload patched source
+      - name: Upload current source
         uses: actions/upload-artifact@v4
         with:
-          name: triaz-groove-builder-source-v0.1.10
+          name: triaz-groove-builder-source-v0.1.11-current
           path: |
             app.py
             launcher.py
