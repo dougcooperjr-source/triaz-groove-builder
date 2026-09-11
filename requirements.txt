@@ -1,0 +1,6 @@
+numpy>=1.26,<3
+scipy>=1.11
+librosa>=0.10.2
+soundfile>=0.12
+tkinterdnd2>=0.4.2
+demucs>=4.0.1
