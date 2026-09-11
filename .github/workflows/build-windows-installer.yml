@@ -2,7 +2,7 @@ name: Build Windows Installer
 
 on:
   push:
-    branches: [main, v0.1.12-editor-workflow]
+    branches: [main, v0.1.12-editor-workflow, v0.1.13-clean-grid-waveform]
   workflow_dispatch:
 
 permissions:
@@ -57,6 +57,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "v0.1.12 patch bundle is invalid." }
           tar -xf v0112_patch.tar.xz
 
+      - name: Apply v0.1.13 visual patch
+        shell: pwsh
+        run: |
+          python patches/v0113_editor_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.13 visual patch failed." }
+
       - name: Validate source and editor features
         shell: pwsh
         run: |
@@ -69,9 +75,9 @@ jobs:
           groove = Path('triaz_groove_builder/groove.py').read_text(encoding='utf-8')
           launcher = Path('launcher.py').read_text(encoding='utf-8')
           installer = Path('installer/triaz_groove_builder.iss').read_text(encoding='utf-8')
-          assert 'v0.1.12' in app
-          assert 'APP_VERSION = "0.1.12"' in launcher
-          assert '#define MyAppVersion "0.1.12"' in installer
+          assert 'v0.1.13' in app
+          assert 'APP_VERSION = "0.1.13"' in launcher
+          assert '#define MyAppVersion "0.1.13"' in installer
           assert 'DisableDirPage=no' in installer
           assert 'EDIT GROOVE' not in app
           assert 'load_for_index' in editor
@@ -81,7 +87,11 @@ jobs:
           assert 'source_transient_families' in groove
           assert '▶ PLAY OVERLAY' in editor
           assert '_draw_playhead_only' in editor
-          print('v0.1.12 source validation passed')
+          assert 'colour-coded by detected drum family' in editor
+          assert 'source evidence is not painted as guide lines' in editor
+          assert "text=f'BAR {(i // 16) + 1}'" in editor
+          assert 'c.create_line(x, self.wave_top, x, bottom' not in editor
+          print('v0.1.13 source validation passed')
           '@ | python -
 
       - name: Build launcher EXE
@@ -113,14 +123,14 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
-          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.12.exe | Select-Object -First 1
-          if (!$installer) { throw "v0.1.12 Setup.exe was not created." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.13.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.13 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.12
-          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.12.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.13
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.13.exe
           if-no-files-found: error
           retention-days: 30
