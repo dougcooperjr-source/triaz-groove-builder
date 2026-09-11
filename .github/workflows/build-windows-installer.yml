@@ -16,11 +16,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract application source
+        shell: pwsh
+        run: |
+          tar -xzf src_bundle.tar.gz
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+
+      - name: Validate source
+        shell: pwsh
+        run: |
+          python -m py_compile app.py launcher.py triaz_groove_builder\*.py
 
       - name: Build launcher EXE
         shell: pwsh
