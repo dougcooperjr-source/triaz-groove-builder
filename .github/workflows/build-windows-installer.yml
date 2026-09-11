@@ -19,10 +19,23 @@ jobs:
       - name: Expand v0.1.11 source bundle
         shell: pwsh
         run: |
-          if (!(Test-Path "bundle\source_v0111.tar.xz")) { throw "v0.1.11 source bundle is missing." }
-          tar -tf "bundle\source_v0111.tar.xz" | Out-Null
+          $parts = @(
+            "bundle\v0111_part00a.txt",
+            "bundle\v0111_part00b.txt",
+            "bundle\v0111_part01.txt",
+            "bundle\v0111_part02.txt",
+            "bundle\v0111_part03.txt",
+            "bundle\v0111_part04.txt",
+            "bundle\v0111_part05.txt"
+          )
+          foreach ($p in $parts) {
+            if (!(Test-Path $p)) { throw "Missing source part: $p" }
+          }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
+          tar -tf source_bundle.tar.xz | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "v0.1.11 source bundle is invalid." }
-          tar -xf "bundle\source_v0111.tar.xz"
+          tar -xf source_bundle.tar.xz
           if (!(Test-Path "app.py")) { throw "Source bundle did not extract correctly." }
           if (!(Test-Path "launcher.py")) { throw "Launcher source is missing." }
           if (!(Test-Path "triaz_groove_builder\editor.py")) { throw "Groove Editor source is missing." }
