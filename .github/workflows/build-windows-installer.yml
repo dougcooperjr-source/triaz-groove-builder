@@ -34,11 +34,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Apply v0.1.10 startup reliability fix
+        shell: pwsh
+        run: |
+          python build_patches\v0110_startup_fix.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.10 patch failed." }
+
       - name: Validate source
         shell: pwsh
         run: |
           python -m compileall -q app.py launcher.py triaz_groove_builder
           if ($LASTEXITCODE -ne 0) { throw "Python source validation failed." }
+          python -c "from pathlib import Path; s=Path('launcher.py').read_text(); a=Path('app.py').read_text(); assert 'APP_VERSION = \"0.1.10\"' in s; assert '--startup-sentinel' in s; assert 'APP_LOG_FILE' in s; assert 'v0.1.10' in a"
 
       - name: Build launcher EXE
         shell: pwsh
@@ -69,14 +76,14 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
-          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.9.exe | Select-Object -First 1
-          if (!$installer) { throw "v0.1.9 Setup.exe was not created." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.10.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.10 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.9
-          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.9.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.10
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.10.exe
           if-no-files-found: error
           retention-days: 30
