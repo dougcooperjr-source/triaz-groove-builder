@@ -1,0 +1,186 @@
+name: Build Windows Installer v0.1.21
+
+on:
+  push:
+    branches: [v0.1.20-free-loop-brace]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Expand v0.1.11 source bundle
+        shell: pwsh
+        run: |
+          $parts = @(
+            "bundle\v0111_part00a.txt",
+            "bundle\v0111_part00b.txt",
+            "bundle\v0111_part01.txt",
+            "bundle\v0111_part02.txt",
+            "bundle\v0111_part03.txt",
+            "bundle\v0111_part04.txt",
+            "bundle\v0111_part05.txt"
+          )
+          foreach ($p in $parts) {
+            if (!(Test-Path $p)) { throw "Missing source part: $p" }
+          }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
+          tar -tf source_bundle.tar.xz | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.11 source bundle is invalid." }
+          tar -xf source_bundle.tar.xz
+          if (!(Test-Path "app.py")) { throw "Source bundle did not extract correctly." }
+          if (!(Test-Path "launcher.py")) { throw "Launcher source is missing." }
+          if (!(Test-Path "triaz_groove_builder\editor.py")) { throw "Groove Editor source is missing." }
+          if (!(Test-Path "installer\triaz_groove_builder.iss")) { throw "Installer source was not extracted." }
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply v0.1.12 editor patch
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "bundle\v0112_patch_part*.txt" | Sort-Object Name
+          if ($parts.Count -ne 3) { throw "Expected 3 v0.1.12 patch parts; found $($parts.Count)." }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("v0112_patch.tar.xz", [Convert]::FromBase64String($b64))
+          tar -tf v0112_patch.tar.xz | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.12 patch bundle is invalid." }
+          tar -xf v0112_patch.tar.xz
+
+      - name: Apply v0.1.13 visual patch
+        shell: pwsh
+        run: |
+          python patches/v0113_editor_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.13 visual patch failed." }
+
+      - name: Apply v0.1.14 waveform hotfix
+        shell: pwsh
+        run: |
+          $parts = @(
+            "bundle\v0114_patch_part00a.txt",
+            "bundle\v0114_patch_part00b.txt"
+          )
+          foreach ($p in $parts) {
+            if (!(Test-Path $p)) { throw "Missing v0.1.14 patch part: $p" }
+          }
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("v0114_patch.tar.xz", [Convert]::FromBase64String($b64))
+          tar -tf v0114_patch.tar.xz | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.14 patch bundle is invalid." }
+          tar -xf v0114_patch.tar.xz
+
+      - name: Apply v0.1.15 source-event matching patch
+        shell: pwsh
+        run: |
+          python patches/v0115_source_match_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.15 source-event matching patch failed." }
+
+      - name: Apply v0.1.16 BPM override rollback patch
+        shell: pwsh
+        run: |
+          python patches/v0116_bpm_rollback_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.16 BPM override rollback patch failed." }
+
+      - name: Apply v0.1.17 kick-anchor patch
+        shell: pwsh
+        run: |
+          python patches/v0117_kick_anchor_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.17 kick-anchor patch failed." }
+
+      - name: Apply v0.1.18 strict kick-anchor patch
+        shell: pwsh
+        run: |
+          python patches/v0118_strict_kick_anchor_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.18 strict kick-anchor patch failed." }
+
+      - name: Apply v0.1.19 loop brace patch
+        shell: pwsh
+        run: |
+          python patches/v0119_loop_brace_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.19 loop brace patch failed." }
+
+      - name: Apply v0.1.20 free loop brace patch
+        shell: pwsh
+        run: |
+          python patches/v0120_free_loop_brace_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.20 free loop brace patch failed." }
+
+      - name: Apply v0.1.21 braced loop audition patch
+        shell: pwsh
+        run: |
+          python patches/v0121_loop_audition_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.21 braced loop audition patch failed." }
+
+      - name: Validate source
+        shell: pwsh
+        run: |
+          python -m compileall -q app.py launcher.py triaz_groove_builder
+          if ($LASTEXITCODE -ne 0) { throw "Python source validation failed." }
+          @'
+          from pathlib import Path
+          app = Path('app.py').read_text(encoding='utf-8')
+          launcher = Path('launcher.py').read_text(encoding='utf-8')
+          installer = Path('installer/triaz_groove_builder.iss').read_text(encoding='utf-8')
+          assert 'v0.1.21' in app
+          assert 'APP_VERSION = "0.1.21"' in launcher
+          assert '#define MyAppVersion "0.1.21"' in installer
+          assert 'TRIAZ_Groove_Builder_Setup_0.1.21.exe' in installer
+          assert '▶ Play Braced Loop' in app
+          assert '■ Stop Loop' in app
+          assert 'def play_braced_loop' in app
+          assert 'Set Bar 1' not in app
+          assert '10 ms' not in app
+          assert '_nudge_brace_seconds' not in app
+          print('v0.1.21 source validation passed')
+          '@ | python -
+
+      - name: Build launcher EXE
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+          pyinstaller --noconfirm --clean --onefile --windowed --name "TRIAZ Groove Builder" launcher.py
+          if (!(Test-Path "dist\TRIAZ Groove Builder.exe")) { throw "Launcher EXE was not created." }
+
+      - name: Download private Python bootstrap
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" -OutFile "build/python-3.11.9-amd64.exe"
+          if (!(Test-Path "build\python-3.11.9-amd64.exe")) { throw "Python bootstrap download failed." }
+
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler not found." }
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.21.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.21 Setup.exe was not created." }
+          Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.21
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.21.exe
+          if-no-files-found: error
+          retention-days: 30
