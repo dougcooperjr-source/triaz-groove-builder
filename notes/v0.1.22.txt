@@ -1,0 +1,1 @@
+v0.1.22 loop waveform colors and braced-loop playhead build trigger.
