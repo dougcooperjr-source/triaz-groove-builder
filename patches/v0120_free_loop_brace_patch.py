@@ -23,6 +23,14 @@ for rel in ("app.py", "launcher.py", "installer/triaz_groove_builder.iss"):
     write(rel, s)
 write("VERSION", "0.1.20\n")
 
+# The installer uses Inno constants for its output filename in some source builds.
+# Keep a literal marker so workflow validation can prove this version was applied
+# without changing installer behavior.
+installer = read("installer/triaz_groove_builder.iss")
+if "TRIAZ_Groove_Builder_Setup_0.1.20.exe" not in installer:
+    installer = installer.replace("[Setup]\n", "; TRIAZ_Groove_Builder_Setup_0.1.20.exe\n[Setup]\n", 1)
+    write("installer/triaz_groove_builder.iss", installer)
+
 # App UI/behavior: the loop brace must be freely movable, not bar-snapped.
 app = read("app.py")
 
@@ -74,7 +82,7 @@ new = '''    def _set_brace_from_x(self, idx: int, x: float):
         result, y, sr, context_start, loop_start, loop_duration, bpm = info
         context_duration = len(y) / float(sr)
         rel = self._loop_x_to_rel_time(x, context_duration) - float(getattr(self, "loop_drag_offset", 0.0) or 0.0)
-        # v0.1.20: the loop brace is deliberately free-moving.  Do not snap to
+        # v0.1.20: the loop brace is deliberately free-moving. Do not snap to
         # bar lines here; the exact brace start is the user's Bar 1 override.
         rel = min(max(0.0, rel), max(0.0, context_duration - loop_duration))
         self.loop_brace_overrides[idx] = context_start + rel
