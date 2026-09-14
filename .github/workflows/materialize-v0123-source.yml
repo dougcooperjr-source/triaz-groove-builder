@@ -1,0 +1,71 @@
+name: Materialize v0.1.23 Source
+
+on:
+  push:
+    branches: [v0.1.23-phase2-band-grid]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Expand v0.1.11 source bundle
+        shell: pwsh
+        run: |
+          $parts = @(
+            "bundle\v0111_part00a.txt",
+            "bundle\v0111_part00b.txt",
+            "bundle\v0111_part01.txt",
+            "bundle\v0111_part02.txt",
+            "bundle\v0111_part03.txt",
+            "bundle\v0111_part04.txt",
+            "bundle\v0111_part05.txt"
+          )
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("source_bundle.tar.xz", [Convert]::FromBase64String($b64))
+          tar -xf source_bundle.tar.xz
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply patch chain through v0.1.23
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "bundle\v0112_patch_part*.txt" | Sort-Object Name
+          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("v0112_patch.tar.xz", [Convert]::FromBase64String($b64))
+          tar -xf v0112_patch.tar.xz
+          python patches/v0113_editor_patch.py
+          $parts = @("bundle\v0114_patch_part00a.txt","bundle\v0114_patch_part00b.txt")
+          $b64 = ($parts | ForEach-Object { (Get-Content $_ -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("v0114_patch.tar.xz", [Convert]::FromBase64String($b64))
+          tar -xf v0114_patch.tar.xz
+          python patches/v0115_source_match_patch.py
+          python patches/v0116_bpm_rollback_patch.py
+          python patches/v0117_kick_anchor_patch.py
+          python patches/v0118_strict_kick_anchor_patch.py
+          python patches/v0119_loop_brace_patch.py
+          python patches/v0120_free_loop_brace_patch.py
+          python patches/v0121_loop_audition_patch.py
+          python patches/v0122_loop_colors_playhead_patch.py
+          python patches/v0123_phase2_band_grid_patch.py
+          python -m compileall -q app.py launcher.py triaz_groove_builder
+
+      - name: Upload materialized source
+        uses: actions/upload-artifact@v4
+        with:
+          name: triaz-groove-builder-source-v0.1.23-materialized
+          path: |
+            app.py
+            launcher.py
+            requirements.txt
+            triaz_groove_builder/**
+            installer/triaz_groove_builder.iss
+            VERSION
+          retention-days: 7
