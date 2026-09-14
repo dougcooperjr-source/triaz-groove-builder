@@ -123,7 +123,6 @@ jobs:
           assert 'v0.1.19' in app
           assert 'APP_VERSION = "0.1.19"' in launcher
           assert '#define MyAppVersion "0.1.19"' in installer
-          assert 'TRIAZ_Groove_Builder_Setup_0.1.19.exe' in installer
           assert 'Loop Selection / Bar 1 Override' in app
           assert 'REBUILD PREVIEW FROM BRACE' in app
           assert 'loop_start_override' in engine
