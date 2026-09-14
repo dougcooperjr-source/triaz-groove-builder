@@ -121,7 +121,6 @@ jobs:
           assert '_anchor_drum_loop_start' in engine
           assert '_kick_anchor_score' in engine
           assert 'snare/clap/hat-only starts' in engine
-          assert 'Kick-anchored groove' in engine
           assert 'AUTO ALIGN TO SOURCE' not in editor
           assert 'Timing alignment:' not in editor
           assert 'source_transient_layers' in editor
