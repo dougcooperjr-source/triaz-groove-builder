@@ -1,8 +1,8 @@
-name: Build Windows Installer
+name: Build Windows Installer v0.1.18
 
 on:
   push:
-    branches: [main, v0.1.12-editor-workflow, v0.1.13-clean-grid-waveform, v0.1.14-waveform-hotfix, v0.1.15-source-event-matching, v0.1.16-bpm-override-rollback, v0.1.17-kick-anchored-loop-start]
+    branches: [v0.1.17-kick-anchored-loop-start]
   workflow_dispatch:
 
 permissions:
@@ -97,6 +97,12 @@ jobs:
           python patches/v0117_kick_anchor_patch.py
           if ($LASTEXITCODE -ne 0) { throw "v0.1.17 kick-anchor patch failed." }
 
+      - name: Apply v0.1.18 strict kick-anchor patch
+        shell: pwsh
+        run: |
+          python patches/v0118_strict_kick_anchor_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.18 strict kick-anchor patch failed." }
+
       - name: Validate source and editor features
         shell: pwsh
         run: |
@@ -110,17 +116,21 @@ jobs:
           engine = Path('triaz_groove_builder/engine.py').read_text(encoding='utf-8')
           launcher = Path('launcher.py').read_text(encoding='utf-8')
           installer = Path('installer/triaz_groove_builder.iss').read_text(encoding='utf-8')
-          assert 'v0.1.17' in app
-          assert 'APP_VERSION = "0.1.17"' in launcher
-          assert '#define MyAppVersion "0.1.17"' in installer
+          assert 'v0.1.18' in app
+          assert 'APP_VERSION = "0.1.18"' in launcher
+          assert '#define MyAppVersion "0.1.18"' in installer
+          assert 'TRIAZ_Groove_Builder_Setup_0.1.18.exe' in installer
           assert 'DisableDirPage=no' in installer
           assert 'EDIT GROOVE' not in app
           assert 'Set BPM' in app
           assert 'bpm_override=self.bpm_overrides.get(i)' in app
           assert 'bpm_override: float | None = None' in engine
+          assert 'source_transient_times, source_transient_layers' in engine
           assert '_anchor_drum_loop_start' in engine
-          assert '_kick_anchor_score' in engine
-          assert 'snare/clap/hat-only starts' in engine
+          assert '_kick_dominant_event_indices' in engine
+          assert 'snare/clap/hat-only starts' not in engine
+          assert 'Strict kick-anchored groove' in engine
+          assert 'kick-dominant source event' in engine
           assert 'AUTO ALIGN TO SOURCE' not in editor
           assert 'Timing alignment:' not in editor
           assert 'source_transient_layers' in editor
@@ -130,7 +140,7 @@ jobs:
           assert 'retained the stronger 2-bar half' in groove
           assert '_resize_selected_velocity' in editor
           assert '_nudge_velocity' in editor
-          print('v0.1.17 source validation passed')
+          print('v0.1.18 source validation passed')
           '@ | python -
 
       - name: Build launcher EXE
@@ -162,14 +172,14 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
-          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.17.exe | Select-Object -First 1
-          if (!$installer) { throw "v0.1.17 Setup.exe was not created." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.18.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.18 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.17
-          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.17.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.18
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.18.exe
           if-no-files-found: error
           retention-days: 30
