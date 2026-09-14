@@ -2,7 +2,7 @@ name: Build Windows Installer
 
 on:
   push:
-    branches: [main, v0.1.12-editor-workflow, v0.1.13-clean-grid-waveform, v0.1.14-waveform-hotfix]
+    branches: [main, v0.1.12-editor-workflow, v0.1.13-clean-grid-waveform, v0.1.14-waveform-hotfix, v0.1.15-source-event-matching, v0.1.16-bpm-override-rollback]
   workflow_dispatch:
 
 permissions:
@@ -79,6 +79,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "v0.1.14 patch bundle is invalid." }
           tar -xf v0114_patch.tar.xz
 
+      - name: Apply v0.1.15 source-event matching patch
+        shell: pwsh
+        run: |
+          python patches/v0115_source_match_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.15 source-event matching patch failed." }
+
+      - name: Apply v0.1.16 BPM override rollback patch
+        shell: pwsh
+        run: |
+          python patches/v0116_bpm_rollback_patch.py
+          if ($LASTEXITCODE -ne 0) { throw "v0.1.16 BPM override rollback patch failed." }
+
       - name: Validate source and editor features
         shell: pwsh
         run: |
@@ -89,24 +101,28 @@ jobs:
           app = Path('app.py').read_text(encoding='utf-8')
           editor = Path('triaz_groove_builder/editor.py').read_text(encoding='utf-8')
           groove = Path('triaz_groove_builder/groove.py').read_text(encoding='utf-8')
+          engine = Path('triaz_groove_builder/engine.py').read_text(encoding='utf-8')
           launcher = Path('launcher.py').read_text(encoding='utf-8')
           installer = Path('installer/triaz_groove_builder.iss').read_text(encoding='utf-8')
-          assert 'v0.1.14' in app
-          assert 'APP_VERSION = "0.1.14"' in launcher
-          assert '#define MyAppVersion "0.1.14"' in installer
+          assert 'v0.1.16' in app
+          assert 'APP_VERSION = "0.1.16"' in launcher
+          assert '#define MyAppVersion "0.1.16"' in installer
           assert 'DisableDirPage=no' in installer
           assert 'EDIT GROOVE' not in app
-          assert 'load_for_index' in editor
-          assert 'Drag-select multiple hits' in editor
-          assert '_promote_lane_if_exact' in editor
-          assert 'source_transient_families' in editor
-          assert 'source_transient_families' in groove
-          assert '▶ PLAY OVERLAY' in editor
-          assert '_draw_playhead_only' in editor
-          assert 'vertical slice per display bin' in editor
-          assert 'list(reversed(lower))' not in editor
-          assert 'c.create_line(x, self.wave_top, x, bottom' not in editor
-          print('v0.1.14 source validation passed')
+          assert 'Set BPM' in app
+          assert 'bpm_override=self.bpm_overrides.get(i)' in app
+          assert 'bpm_override: float | None = None' in engine
+          assert '_anchor_drum_loop_start' in engine
+          assert 'AUTO ALIGN TO SOURCE' not in editor
+          assert 'Timing alignment:' not in editor
+          assert 'source_transient_layers' in editor
+          assert 'source_transient_layers' in groove
+          assert 'Source-event transcription: multi-label' not in groove
+          assert 'high-recall source-event union' not in groove
+          assert 'retained the stronger 2-bar half' in groove
+          assert '_resize_selected_velocity' in editor
+          assert '_nudge_velocity' in editor
+          print('v0.1.16 source validation passed')
           '@ | python -
 
       - name: Build launcher EXE
@@ -138,14 +154,14 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\triaz_groove_builder.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
-          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.14.exe | Select-Object -First 1
-          if (!$installer) { throw "v0.1.14 Setup.exe was not created." }
+          $installer = Get-ChildItem artifacts\TRIAZ_Groove_Builder_Setup_0.1.16.exe | Select-Object -First 1
+          if (!$installer) { throw "v0.1.16 Setup.exe was not created." }
           Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.14
-          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.14.exe
+          name: TRIAZ-Groove-Builder-Windows-Installer-0.1.16
+          path: artifacts/TRIAZ_Groove_Builder_Setup_0.1.16.exe
           if-no-files-found: error
           retention-days: 30
